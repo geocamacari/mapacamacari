@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa Interativo de Camaçari</title>
+
+    <!-- === DEPENDÊNCIAS (CSS) === -->
+    <!-- Leaflet.js (Núcleo) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Plugin de Geocodificação (Busca) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-geosearch@3.11.0/dist/geosearch.css"/>
+
+    <!-- Ícones (Font Awesome para o botão "Encontre-me") -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* Estilo base para garantir que o mapa ocupe toda a tela */
+        html, body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            overflow: hidden; /* Evita barras de rolagem */
+        }
+
+        #map-container {
+            height: 100%;
+            width: 100%;
+            position: relative;
+        }
+        
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+
+        /* Estilizando o controle de opacidade */
+        .leaflet-control-opacity {
+            background-color: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+        }
+        .leaflet-control-opacity label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        .leaflet-control-opacity input[type="range"] {
+            width: 120px;
+        }
+
+        /* Estilizando botões de controle personalizados */
+        .leaflet-control-custom a {
+            background-color: white;
+            font-size: 1.4em;
+            color: #333;
+            cursor: pointer;
+            line-height: 1.45; /* Ajuste para centralizar o ícone */
+            height: 30px;
+            width: 30px;
+            display: block;
+            text-align: center;
+            border-radius: 4px;
+        }
+        .leaflet-control-custom a:hover {
+            background-color: #f4f4f4;
+            color: #0078A8;
+        }
+
+        /* Estilos para o popup de coordenadas */
+        .coords-popup-content {
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        .coords-popup-content h4 {
+            margin: 0 0 5px 0;
+            font-size: 1.1em;
+        }
+        .coords-popup-content p {
+            margin: 2px 0;
+        }
+         .coords-popup-content a {
+            color: #0078A8;
+            text-decoration: none;
+            font-weight: bold;
+            display: block;
+            margin-top: 5px;
+        }
+        .coords-popup-content a:hover {
+            text-decoration: underline;
+        }
+        
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 2000; 
+            left: 0;
+            top: 0;
+            width: 100%; 
+            height: 100%; 
+            overflow: auto; 
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 90%;
+            max-width: 400px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .modal-content input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+        .modal-content button {
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* Estilos para o rodapé */
+        .map-footer {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(4px);
+            padding: 5px 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            pointer-events: none;
+            font-size: 0.7em;
+            color: #444;
+            line-height: 1.4;
+            max-width: 90%;
+        }
+        .map-footer p {
+            margin: 0;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="map-container">
+        <div id="map"></div>
+        <!-- Rodapé do Mapa -->
+        <div class="map-footer">
+            <p><strong>Mapa Interativo Online de Camaçari-Ba - Junho /2025</strong></p>
+            <p style="margin-top: 5px;"><strong>REALIZAÇÃO:</strong><br>
+            Fábio Moura Costa – Urbanista e Msc. em Geografia<br>
+            Coordenadoria de Planejamento e Projetos (CPP)<br>
+            Diretoria de Urbanismo (DIRURB)<br>
+            Secretaria de Desenvolvimento Urbano e Meio Ambiente (SEDUR) / PMC</p>
+        </div>
+    </div>
+
+
+    <!-- Modal para localizar por coordenadas -->
+    <div id="locate-modal" class="modal">
+        <div class="modal-content">
+            <span id="close-modal-btn" class="close-button">&times;</span>
+            <h4>Localizar por Coordenada</h4>
+            <p style="font-size: 0.8em; color: #555;">Cole Lat/Lon (ex: -12.7, -38.3) ou UTM (ex: 575123, 8596345)</p>
+            <input type="text" id="coord-input" placeholder="Insira as coordenadas aqui...">
+            <button id="locate-btn">Localizar</button>
+        </div>
+    </div>
+
+
+    <!-- === DEPENDÊNCIAS (JAVASCRIPT) === -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet-providers@1.13.0/leaflet-providers.js"></script>
+    <script src="https://unpkg.com/leaflet-geosearch@3.11.0/dist/geosearch.umd.js"></script>
+
+    <script>
+        // Aguarda o carregamento completo da janela antes de inicializar o mapa
+        window.onload = function () {
+            // --- 1. INICIALIZAÇÃO DO MAPA ---
+            const initialCoords = [-12.6978, -38.3242];
+            const initialZoom = 10;
+            const map = L.map('map', {
+                center: initialCoords,
+                zoom: initialZoom
+            });
+            let locatedMarker = null; // Marcador para a localização por coordenadas
+            
+            // Limites de Camaçari para restringir a navegação
+            const camaçariGeoJSON = { "type": "Polygon", "coordinates": [[[-38.331, -12.512], [-38.263, -12.535], [-38.223, -12.528], [-38.187, -12.545], [-38.163, -12.522], [-38.127, -12.541], [-38.077, -12.538], [-38.062, -12.592], [-38.019, -12.639], [-37.962, -12.698], [-38.001, -12.759], [-38.043, -12.784], [-38.086, -12.827], [-38.161, -12.845], [-38.224, -12.841], [-38.279, -12.872], [-38.349, -12.835], [-38.356, -12.783], [-38.411, -12.748], [-38.423, -12.68], [-38.448, -12.62], [-38.394, -12.584], [-38.331, -12.512]]] };
+            const camaçariLayer = L.geoJSON(camaçariGeoJSON);
+            const mapBounds = camaçariLayer.getBounds().pad(0.1); // Adiciona um pequeno preenchimento
+            map.setMaxBounds(mapBounds);
+            map.setMinZoom(9);
+
+
+            // --- 2. CAMADAS BASE E DE SOBREPOSIÇÃO ---
+            const baseLayers = {
+                '<b>Padrão (Ruas)</b>': L.tileLayer.provider('OpenStreetMap.Mapnik'),
+                '<b>Satélite (Imagens Aéreas)</b>': L.tileLayer.provider('Esri.WorldImagery'),
+                '<b>ESRI Topo</b>': L.tileLayer.provider('Esri.WorldTopoMap'),
+                '<b>Mapa Escuro</b>': L.tileLayer.provider('CartoDB.DarkMatter'),
+            };
+            
+            // [ATUALIZADO] Camadas temáticas corrigidas e novas adicionadas.
+            const overlayLayers = {
+                // [REMOVIDO] A camada 'Limite de Camaçari (Destacado)' foi removida.
+                '<b>Topografia (OpenTopoMap)</b>': L.tileLayer.provider('OpenTopoMap', { pane: 'overlayPane' }),
+                '<b>Fronteiras e Locais</b>': L.tileLayer.provider('CartoDB.PositronOnlyLabels', { pane: 'overlayPane' }),
+                '<b>Satélite (Google)</b>': L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
+                    maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'], pane: 'overlayPane', attribution: 'Google'
+                }),
+                '<b>Ciclovias (CyclOSM)</b>': L.tileLayer.provider('CyclOSM', { pane: 'overlayPane' }),
+                // [CORREÇÃO] O geoserviço da SEI-BA foi substituído por um do IBGE, que é mais estável.
+                '<b>Limites Municipais (IBGE)</b>': L.tileLayer.wms('https://geoservicos.ibge.gov.br/geoserver/ows?', {
+                    layers: 'BCIM_V3:lim_municipio_a',
+                    format: 'image/png',
+                    transparent: true,
+                    attribution: 'IBGE',
+                    pane: 'overlayPane'
+                })
+            };
+            
+            // Define a camada base padrão
+            baseLayers['<b>Padrão (Ruas)</b>'].addTo(map);
+
+            // --- 3. CONTROLE DE CAMADAS ---
+            L.control.layers(baseLayers, overlayLayers, { collapsed: false }).addTo(map);
+
+            // --- 4. MARCADOR PRINCIPAL ---
+            L.marker([-12.6978, -38.3242]).addTo(map)
+                .bindPopup("<b>Camaçari, BA</b><br>(um gigante metropolitano)")
+                .openPopup();
+
+            // --- 5. ADIÇÃO DE FUNCIONALIDADES E CONTROLES ---
+            L.control.scale({ imperial: false, metric: true }).addTo(map);
+
+            map.addControl(new GeoSearch.GeoSearchControl({
+                provider: new GeoSearch.OpenStreetMapProvider(),
+                style: 'bar', autoClose: true, keepResult: true, searchLabel: 'Buscar endereço...'
+            }));
+
+            // --- 6. CONTROLES PERSONALIZADOS ---
+            const OpacityControl = L.Control.extend({
+                onAdd: function(map) {
+                    const container = L.DomUtil.create('div', 'leaflet-control-opacity leaflet-bar');
+                    container.innerHTML = `<label for="opacity-slider">Opacidade das Camadas Temáticas</label><input id="opacity-slider" type="range" min="0" max="1" step="0.1" value="1">`;
+                    L.DomEvent.disableClickPropagation(container);
+                    return container;
+                }
+            });
+            map.addControl(new OpacityControl({ position: 'topright' }));
+
+            document.getElementById('opacity-slider').addEventListener('input', function(e) {
+                const newOpacity = e.target.value;
+                for (const layerName in overlayLayers) {
+                    const layer = overlayLayers[layerName];
+                    if (map.hasLayer(layer) && typeof layer.setOpacity === 'function') {
+                        layer.setOpacity(newOpacity);
+                    }
+                }
+            });
+
+            const LocateControl = L.Control.extend({
+                onAdd: (map) => {
+                    const container = L.DomUtil.create('div', 'leaflet-control-custom leaflet-bar');
+                    const link = L.DomUtil.create('a', '', container);
+                    link.href = '#'; link.title = 'Encontrar minha localização';
+                    link.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i>';
+                    L.DomEvent.on(link, 'click', L.DomEvent.stop).on(link, 'click', () => map.locate({ setView: true, maxZoom: 16 }));
+                    return container;
+                }
+            });
+            map.addControl(new LocateControl({ position: 'topleft' }));
+            
+            const HomeControl = L.Control.extend({
+                onAdd: (map) => {
+                    const container = L.DomUtil.create('div', 'leaflet-control-custom leaflet-bar');
+                    const link = L.DomUtil.create('a', '', container);
+                    link.href = '#'; link.title = 'Voltar à visualização inicial';
+                    link.innerHTML = '<i class="fa-solid fa-house"></i>';
+                    L.DomEvent.on(link, 'click', L.DomEvent.stop).on(link, 'click', () => map.setView(initialCoords, initialZoom));
+                    return container;
+                }
+            });
+            map.addControl(new HomeControl({ position: 'topleft' }));
+
+            const CoordLocateControl = L.Control.extend({
+                onAdd: (map) => {
+                    const container = L.DomUtil.create('div', 'leaflet-control-custom leaflet-bar');
+                    const link = L.DomUtil.create('a', '', container);
+                    link.href = '#'; link.title = 'Localizar por Coordenada';
+                    link.innerHTML = '<i class="fa-solid fa-magnifying-glass-location"></i>';
+                    L.DomEvent.on(link, 'click', L.DomEvent.stop).on(link, 'click', () => {
+                        document.getElementById('locate-modal').style.display = 'block';
+                    });
+                    return container;
+                }
+            });
+            map.addControl(new CoordLocateControl({position: 'topleft'}));
+
+            // --- 7. EVENTOS DO MAPA E DO MODAL ---
+            map.on('click', function(e) {
+                const lat = e.latlng.lat;
+                const lng = e.latlng.lng;
+                const utmCoords = latLonToUTM(lat, lng, 24);
+                const googleMapsLink = `https://www.google.com/maps?q=${lat},${lng}`;
+                const googleStreetViewLink = `https://www.google.com/maps?q=&layer=c&cbll=${lat},${lng}`;
+
+                L.popup()
+                    .setLatLng(e.latlng)
+                    .setContent(`<div class="coords-popup-content"><h4>Informações do Ponto</h4><p><b>Latitude:</b> ${lat.toFixed(6)}</p><p><b>Longitude:</b> ${lng.toFixed(6)}</p><hr><p><b>UTM (SIRGAS 2000 / Fuso 24S)</b></p><p><b>E:</b> ${utmCoords.easting.toFixed(2)}</p><p><b>N:</b> ${utmCoords.northing.toFixed(2)}</p><p><b>Fuso:</b> ${utmCoords.zoneNum} ${utmCoords.zoneLetter}</p><hr><a href="${googleMapsLink}" target="_blank">Abrir no Google Maps</a><a href="${googleStreetViewLink}" target="_blank">Ver no Street View</a></div>`)
+                    .openOn(map);
+            });
+            
+            map.on('locationfound', e => L.marker(e.latlng).addTo(map).bindPopup("Você está aqui!").openPopup());
+            map.on('locationerror', e => L.popup().setLatLng(map.getCenter()).setContent("<b>Não foi possível obter sua localização.</b>").openOn(map));
+            
+            const modal = document.getElementById('locate-modal');
+            document.getElementById('close-modal-btn').onclick = () => modal.style.display = 'none';
+            document.getElementById('locate-btn').onclick = locateFromInput;
+            window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; };
+
+            // --- 8. FUNÇÕES DE LOCALIZAÇÃO E CONVERSÃO ---
+            function locateFromInput() {
+                const input = document.getElementById('coord-input').value.trim();
+                const coords = input.split(/[\s,;]+/).map(Number);
+                
+                if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) {
+                    alert("Formato de coordenada inválido. Use dois números separados por vírgula, espaço ou ponto e vírgula.");
+                    return;
+                }
+
+                let lat, lon;
+                if (Math.abs(coords[0]) > 180 || Math.abs(coords[1]) > 180) { // Provavelmente UTM
+                    const utmResult = utmToLatLon(24, coords[0], coords[1], false);
+                    lat = utmResult.lat;
+                    lon = utmResult.lon;
+                } else { // Provavelmente Lat/Lon
+                    lat = coords[0];
+                    lon = coords[1];
+                }
+
+                if (locatedMarker) map.removeLayer(locatedMarker);
+                locatedMarker = L.marker([lat, lon]).addTo(map);
+                map.setView([lat, lon], 15);
+                modal.style.display = 'none';
+            }
+            
+            function utmToLatLon(zone, easting, northing, northernHemisphere) {
+                const k0 = 0.9996; const a = 6378137.0; const f = 1 / 298.257223563;
+                const e2 = 2 * f - f * f; const e_2 = e2 / (1 - e2);
+                const n = (a - a * Math.sqrt(1 - e2)) / (a + a * Math.sqrt(1 - e2));
+                const M0 = 0;
+                const M = M0 + (northing - (northernHemisphere ? 0 : 10000000.0)) / k0;
+                const mu = M / (a * (1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 * e2 * e2 / 256));
+                const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+                const lat1 = mu + (3 * e1 / 2 - 27 * e1 * e1 * e1 / 32) * Math.sin(2 * mu) + (21 * e1 * e1 / 16 - 55 * e1 * e1 * e1 * e1 / 32) * Math.sin(4 * mu) + (151 * e1 * e1 * e1 / 96) * Math.sin(6 * mu);
+                const C1 = e_2 * Math.pow(Math.cos(lat1), 2); const T1 = Math.pow(Math.tan(lat1), 2);
+                const N1 = a / Math.sqrt(1 - e2 * Math.pow(Math.sin(lat1), 2));
+                const R1 = N1 * (1 - e2) / (1 - e2 * Math.pow(Math.sin(lat1), 2));
+                const D = (easting - 500000) / (N1 * k0);
+                let lat = lat1 - (N1 * Math.tan(lat1) / R1) * (D * D / 2 - (5 + 3 * T1 + 10 * C1 - 4 * C1 * C1 - 9 * e_2) * D * D * D * D / 24 + (61 + 90 * T1 + 298 * C1 + 45 * T1 * T1 - 252 * e_2 - 3 * C1 * C1) * D * D * D * D * D * D / 720);
+                let lon = (D - (1 + 2 * T1 + C1) * D * D * D / 6 + (5 - 2 * C1 + 28 * T1 - 3 * C1 * C1 + 8 * e_2 + 24 * T1 * T1) * D * D * D * D * D / 120) / Math.cos(lat1);
+                const lon_cen = (zone - 1) * 6 - 180 + 3;
+                return { lat: lat * 180 / Math.PI, lon: lon_cen + lon * 180 / Math.PI };
+            }
+
+            function latLonToUTM(lat, lon, zone) {
+                const deg2rad = Math.PI / 180;
+                const a = 6378137.0; const f = 1 / 298.257223563; const k0 = 0.9996;
+                const e2 = 2 * f - f * f; const e_2 = e2 / (1.0 - e2);
+                const lon_rad = lon * deg2rad; const lat_rad = lat * deg2rad;
+                const zoneNum = zone;
+                const lon_cen = (zoneNum - 1) * 6 - 180 + 3; const lon_cen_rad = lon_cen * deg2rad;
+                const T = Math.pow(Math.tan(lat_rad), 2);
+                const C = e_2 * Math.pow(Math.cos(lat_rad), 2);
+                const A = (lon_rad - lon_cen_rad) * Math.cos(lat_rad);
+                const N = a / Math.sqrt(1 - e2 * Math.pow(Math.sin(lat_rad), 2));
+                const M = a * ((1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 * e2 * e2 / 256) * lat_rad - (3 * e2 / 8 + 3 * e2 * e2 / 32 + 45 * e2 * e2 * e2 / 1024) * Math.sin(2 * lat_rad) + (15 * e2 * e2 / 256 + 45 * e2 * e2 * e2 / 1024) * Math.sin(4 * lat_rad) - (35 * e2 * e2 * e2 / 3072) * Math.sin(6 * lat_rad));
+                const M0 = 0;
+                const easting = k0 * N * (A + (1 - T + C) * Math.pow(A, 3) / 6 + (5 - 18 * T + T * T + 72 * C - 58 * e_2) * Math.pow(A, 5) / 120) + 500000.0;
+                let northing = k0 * (M - M0 + N * Math.tan(lat_rad) * (A * A / 2 + (5 - T + 9 * C + 4 * C * C) * Math.pow(A, 4) / 24 + (61 - 58 * T + T * T + 600 * C - 330 * e_2) * Math.pow(A, 6) / 720));
+                if (lat < 0) northing += 10000000.0;
+                const zoneLetters = "CDEFGHJKLMNPQRSTUVWXX";
+                const zoneLetter = zoneLetters[Math.floor((lat + 80) / 8)];
+                return { easting: easting, northing: northing, zoneNum: zoneNum, zoneLetter: zoneLetter };
+            }
+        };
+    </script>
+</body>
+</html>
