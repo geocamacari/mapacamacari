@@ -19,14 +19,15 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
 
     <style>
-        /* Estilo base para garantir que o mapa ocupe toda a tela */
+        /* [NOVO] Estilo base com gradiente */
         html, body {
             height: 100%;
             width: 100%;
             margin: 0;
             padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            overflow: hidden; /* Evita barras de rolagem */
+            overflow: hidden; 
+            background: linear-gradient(135deg, #f1c40f, #e67e22, #9b59b6); /* Amarelo -> Laranja -> Violeta */
         }
 
         #map-container {
@@ -40,6 +41,39 @@
             width: 100%;
         }
 
+        /* [NOVO] Estilo do controle de camadas */
+        .leaflet-control-layers {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(5px);
+            border: 1px solid #9b59b6; /* Violeta */
+            border-radius: 8px;
+        }
+
+        /* [NOVO] Estilo dos controles personalizados e de desenho */
+        .leaflet-control-custom a, .leaflet-draw a {
+            background-color: #f39c12 !important; /* Laranja */
+            color: white !important;
+            border-radius: 4px !important;
+            border: 1px solid rgba(0,0,0,0.2) !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .leaflet-control-custom a:hover, .leaflet-draw a:hover {
+            background-color: #e67e22 !important; /* Laranja mais escuro */
+        }
+        
+        /* [NOVO] Estilo da barra de busca */
+        .leaflet-geosearch-bar {
+            background-color: rgba(255, 255, 255, 0.95) !important;
+            border-radius: 8px !important;
+            border: 1px solid #f1c40f !important; /* Amarelo */
+        }
+        .leaflet-popup-content-wrapper {
+            background: rgba(255, 255, 255, 0.9) !important;
+            backdrop-filter: blur(4px);
+            border-radius: 8px;
+            box-shadow: 0 3px 14px rgba(0,0,0,0.4) !important;
+        }
+
         /* Estilizando o controle de opacidade */
         .leaflet-control-opacity {
             background-color: white;
@@ -47,132 +81,39 @@
             border-radius: 5px;
             box-shadow: 0 1px 5px rgba(0,0,0,0.65);
         }
-        .leaflet-control-opacity label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-            color: #333;
-        }
-        .leaflet-control-opacity input[type="range"] {
-            width: 120px;
-        }
-
-        /* Estilizando botões de controle personalizados */
-        .leaflet-control-custom a {
-            background-color: white;
-            font-size: 1.4em;
-            color: #333;
-            cursor: pointer;
-            line-height: 1.45; /* Ajuste para centralizar o ícone */
-            height: 30px;
-            width: 30px;
-            display: block;
-            text-align: center;
-            border-radius: 4px;
-        }
-        .leaflet-control-custom a:hover {
-            background-color: #f4f4f4;
-            color: #0078A8;
-        }
-
+        .leaflet-control-opacity label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
+        .leaflet-control-opacity input[type="range"] { width: 120px; }
+       
         /* Estilos para o popup de coordenadas */
-        .coords-popup-content {
-            font-size: 0.9em;
-            line-height: 1.5;
-        }
-        .coords-popup-content h4 {
-            margin: 0 0 5px 0;
-            font-size: 1.1em;
-        }
-        .coords-popup-content p {
-            margin: 2px 0;
-        }
-         .coords-popup-content a {
-            color: #0078A8;
-            text-decoration: none;
-            font-weight: bold;
-            display: block;
-            margin-top: 5px;
-        }
-        .coords-popup-content a:hover {
-            text-decoration: underline;
-        }
+        .coords-popup-content { font-size: 0.9em; line-height: 1.5; }
+        .coords-popup-content h4 { margin: 0 0 5px 0; font-size: 1.1em; color: #8e44ad; }
+        .coords-popup-content p { margin: 2px 0; }
+        .coords-popup-content a { color: #8e44ad; text-decoration: none; font-weight: bold; display: block; margin-top: 5px; } /* Violeta */
+        .coords-popup-content a:hover { text-decoration: underline; }
         
         .modal {
-            display: none; 
-            position: fixed; 
-            z-index: 2000; 
-            left: 0;
-            top: 0;
-            width: 100%; 
-            height: 100%; 
-            overflow: auto; 
-            background-color: rgba(0,0,0,0.4);
+            display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4);
         }
         .modal-content {
-            background-color: #fefefe;
-            margin: 15% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 90%;
-            max-width: 400px;
-            border-radius: 8px;
-            text-align: center;
+            background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 400px; border-radius: 8px; text-align: center;
         }
-        .modal-content input {
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
-            box-sizing: border-box;
-        }
-        .modal-content button {
-            padding: 10px 20px;
-            cursor: pointer;
-        }
-        .close-button {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
+        .modal-content input { width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box; }
+        .modal-content button { padding: 10px 20px; cursor: pointer; background-color: #f39c12; color: white; border: none; border-radius: 4px; }
+        .close-button { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
 
         /* Estilos para o rodapé */
         .map-footer {
-            position: absolute;
-            bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(4px);
-            padding: 5px 15px;
-            border-radius: 8px;
-            text-align: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            pointer-events: none;
-            font-size: 0.7em;
-            color: #444;
-            line-height: 1.4;
-            max-width: 90%;
+            position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(4px); padding: 5px 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); pointer-events: none; font-size: 0.7em; color: #444; line-height: 1.4; max-width: 90%;
         }
-        .map-footer p {
-            margin: 0;
-        }
+        .map-footer p { margin: 0; }
         
-        /* Estilos para botões de download no popup */
-        .download-button {
-            background-color: #28a745;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            margin: 5px 2px 0 2px;
-            border-radius: 4px;
-            cursor: pointer;
+        /* Estilos para botões de download e compartilhamento no popup */
+        .popup-button {
+            background-color: #16a085; /* Verde Escuro */
+            color: white; border: none; padding: 5px 10px; margin: 5px 2px 0 2px; border-radius: 4px; cursor: pointer; font-size: 0.9em;
         }
-        .download-button:hover {
-            background-color: #218838;
-        }
+        .popup-button:hover { opacity: 0.9; }
+        .popup-button.share { background-color: #8e44ad; } /* Violeta */
 
     </style>
 </head>
@@ -194,7 +135,7 @@
     <!-- Modal para localizar por coordenadas -->
     <div id="locate-modal" class="modal">
         <div class="modal-content">
-            <span id="close-modal-btn" class="close-button">&times;</span>
+            <span class="close-button" onclick="closeModal('locate-modal')">&times;</span>
             <h4>Localizar por Coordenada</h4>
             <p style="font-size: 0.8em; color: #555;">Cole Lat/Lon (ex: -12.7, -38.3) ou UTM (ex: 575123, 8596345)</p>
             <input type="text" id="coord-input" placeholder="Insira as coordenadas aqui...">
@@ -209,18 +150,16 @@
     <script src="https://unpkg.com/leaflet-geosearch@3.11.0/dist/geosearch.umd.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/leaflet-geometryutil@0.9.3/src/leaflet.geometryutil.js"></script>
+    <script src="https://unpkg.com/esri-leaflet@3.0.10/dist/esri-leaflet.js"></script>
 
     <script>
         window.onload = function () {
             // --- 1. INICIALIZAÇÃO DO MAPA ---
-            const initialCoords = [-12.6978, -38.3242];
-            const initialZoom = 10;
-            const map = L.map('map', {
-                center: initialCoords,
-                zoom: initialZoom
-            });
+            const initialCoords = [-12.705974, -38.319771];
+            const initialZoom = 15;
+            const map = L.map('map', { center: initialCoords, zoom: initialZoom });
             let locatedMarker = null;
-            let isDrawing = false; // [NOVO] Flag para controlar o estado de desenho
+            let isDrawing = false; 
 
             const camaçariGeoJSON = { "type": "Polygon", "coordinates": [[[-38.331, -12.512], [-38.263, -12.535], [-38.223, -12.528], [-38.187, -12.545], [-38.163, -12.522], [-38.127, -12.541], [-38.077, -12.538], [-38.062, -12.592], [-38.019, -12.639], [-37.962, -12.698], [-38.001, -12.759], [-38.043, -12.784], [-38.086, -12.827], [-38.161, -12.845], [-38.224, -12.841], [-38.279, -12.872], [-38.349, -12.835], [-38.356, -12.783], [-38.411, -12.748], [-38.423, -12.68], [-38.448, -12.62], [-38.394, -12.584], [-38.331, -12.512]]] };
             const camaçariLayer = L.geoJSON(camaçariGeoJSON);
@@ -239,12 +178,12 @@
             
             const overlayLayers = {
                 '<b>Topografia (OpenTopoMap)</b>': L.tileLayer.provider('OpenTopoMap', { pane: 'overlayPane' }),
-                '<b>Limites e Locais (ESRI)</b>': L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { pane: 'overlayPane', attribution: 'Esri' }),
-                '<b>Satélite (Google)</b>': L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
-                    maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'], pane: 'overlayPane', attribution: 'Google'
-                }),
-                '<b>Ciclovias (CyclOSM)</b>': L.tileLayer.provider('CyclOSM', { pane: 'overlayPane' })
-                // [REMOVIDO] A camada 'Limites Municipais (IBGE)' foi removida.
+                // [CORREÇÃO] Substituído o provedor 'Esri.WorldBoundariesAndPlaces' por um funcional da ESRI.
+                '<b>Limites e Locais (ESRI)</b>': L.esri.dynamicMapLayer({ url: 'https://services.arcgisonline.com/arcgis/rest/services/Reference/World_Boundaries_and_Places/MapServer', pane: 'overlayPane' }),
+                '<b>Satélite (Google)</b>': L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{ maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'], pane: 'overlayPane', attribution: 'Google' }),
+                '<b>Ciclovias (CyclOSM)</b>': L.tileLayer.provider('CyclOSM', { pane: 'overlayPane' }),
+                 '<b>Limites Municipais (IBGE)</b>': L.esri.featureLayer({ url: 'https://services6.arcgis.com/uaRkpyZiQH3wzm7O/arcgis/rest/services/LIM_PerfilMunicipal_AAS_IBGE2022/FeatureServer/21', pane: 'overlayPane', attribution: 'IBGE' }),
+                 '<b>Hidrografia (SEI-BA)</b>': L.tileLayer.wms('https://map.geo.sei.ba.gov.br/arcgis/services/cart_sei_025k/cb_025k_hidrografia/MapServer/WMSServer?', { layers: '10', format: 'image/png', transparent: true, attribution: 'SEI-BA', pane: 'overlayPane'})
             };
             
             baseLayers['<b>Padrão (Ruas)</b>'].addTo(map);
@@ -253,7 +192,7 @@
             L.control.layers(baseLayers, overlayLayers, { collapsed: false }).addTo(map);
 
             // --- 4. MARCADOR PRINCIPAL ---
-            L.marker([-12.6978, -38.3242]).addTo(map).bindPopup("<b>Camaçari, BA</b>").openPopup();
+            L.marker([-12.7059, -38.3197]).addTo(map).bindPopup('<b>Camaçari, BA</b><br>(Um Gigante Metropolitano)<br><a href="https://pt.wikipedia.org/wiki/Camaçari" target="_blank">Ver na Wikipedia</a>').openPopup();
 
             // --- 5. FERRAMENTAS DE DESENHO E MEDIÇÃO ---
             const drawnItems = new L.FeatureGroup();
@@ -262,15 +201,10 @@
             const drawControl = new L.Control.Draw({
                 position: 'topleft',
                 draw: {
-                    polygon: {
-                        shapeOptions: { color: 'purple' },
-                        allowIntersection: false,
-                        drawError: { color: 'orange', timeout: 1000 },
-                        showArea: true,
-                        metric: true
-                    },
+                    polygon: { shapeOptions: { color: 'purple' }, allowIntersection: false, showArea: true, metric: true },
+                    polyline: { shapeOptions: { color: 'blue' }, showLength: true, metric: true },
                     marker: true,
-                    polyline: false, rectangle: false, circle: false, circlemarker: false
+                    rectangle: false, circle: false, circlemarker: false
                 },
                 edit: { featureGroup: drawnItems }
             });
@@ -280,14 +214,7 @@
             L.control.scale({ imperial: false, metric: true }).addTo(map);
             map.addControl(new GeoSearch.GeoSearchControl({ provider: new GeoSearch.OpenStreetMapProvider(), style: 'bar', autoClose: true, keepResult: true, searchLabel: 'Buscar endereço...' }));
 
-            const OpacityControl = L.Control.extend({
-                onAdd: function(map) {
-                    const container = L.DomUtil.create('div', 'leaflet-control-opacity leaflet-bar');
-                    container.innerHTML = `<label for="opacity-slider">Opacidade das Camadas Temáticas</label><input id="opacity-slider" type="range" min="0" max="1" step="0.1" value="1">`;
-                    L.DomEvent.disableClickPropagation(container);
-                    return container;
-                }
-            });
+            const OpacityControl = L.Control.extend({ onAdd: function(map) { const container = L.DomUtil.create('div', 'leaflet-control-opacity leaflet-bar'); container.innerHTML = `<label for="opacity-slider">Opacidade das Camadas Temáticas</label><input id="opacity-slider" type="range" min="0" max="1" step="0.1" value="1">`; L.DomEvent.disableClickPropagation(container); return container; } });
             map.addControl(new OpacityControl({ position: 'topright' }));
             
             const LocateControl = L.Control.extend({ onAdd: (map) => { const container = L.DomUtil.create('div', 'leaflet-control-custom leaflet-bar'); const link = L.DomUtil.create('a', '', container); link.href = '#'; link.title = 'Encontrar minha localização'; link.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i>'; L.DomEvent.on(link, 'click', L.DomEvent.stop).on(link, 'click', () => map.locate({ setView: true, maxZoom: 16 })); return container; } });
@@ -300,38 +227,17 @@
             map.addControl(new CoordLocateControl({position: 'topleft'}));
 
             // --- 7. EVENTOS DO MAPA E DO MODAL ---
-            // [NOVO] Eventos para controlar o estado de desenho
-            map.on('draw:drawstart', function() {
-                isDrawing = true;
-            });
-            map.on('draw:drawstop', function() {
-                isDrawing = false;
-            });
-            map.on('draw:editstart', function() {
-                isDrawing = true;
-            });
-            map.on('draw:editstop', function() {
-                isDrawing = false;
-            });
-            map.on('draw:deletestart', function() {
-                isDrawing = true;
-            });
-            map.on('draw:deletestop', function() {
-                isDrawing = false;
-            });
+            map.on('draw:drawstart', function() { isDrawing = true; });
+            map.on('draw:drawstop', function() { setTimeout(() => { isDrawing = false; }, 100); });
+            map.on('draw:editstart', function() { isDrawing = true; });
+            map.on('draw:editstop', function() { isDrawing = false; });
+            map.on('draw:deletestart', function() { isDrawing = true; });
+            map.on('draw:deletestop', function() { isDrawing = false; });
 
-
-            map.on(L.Draw.Event.CREATED, function (e) {
-                const layer = e.layer;
-                drawnItems.addLayer(layer);
-                bindDownloadPopup(layer);
-            });
+            map.on(L.Draw.Event.CREATED, function (e) { const layer = e.layer; drawnItems.addLayer(layer); bindDownloadPopup(layer); });
 
             map.on('click', function(e) {
-                // [ATUALIZADO] Verifica se o modo de desenho está ativo antes de mostrar o popup de coordenadas
-                if (isDrawing || (e.originalEvent.target.classList && e.originalEvent.target.classList.contains('download-button'))) {
-                    return; 
-                }
+                if (isDrawing || (e.originalEvent.target.classList && e.originalEvent.target.classList.contains('popup-button'))) return; 
                 
                 const lat = e.latlng.lat;
                 const lng = e.latlng.lng;
@@ -345,85 +251,41 @@
             map.on('locationfound', e => L.marker(e.latlng).addTo(map).bindPopup("Você está aqui!").openPopup());
             map.on('locationerror', e => L.popup().setLatLng(map.getCenter()).setContent("<b>Não foi possível obter sua localização.</b>").openOn(map));
             
-            document.getElementById('opacity-slider').addEventListener('input', function(e) {
-                const newOpacity = e.target.value;
-                for (const layerName in overlayLayers) {
-                    const layer = overlayLayers[layerName];
-                    if (map.hasLayer(layer) && typeof layer.setOpacity === 'function') { layer.setOpacity(newOpacity); }
-                }
-            });
-
-            const modal = document.getElementById('locate-modal');
-            document.getElementById('close-modal-btn').onclick = () => modal.style.display = 'none';
+            document.getElementById('opacity-slider').addEventListener('input', function(e) { const newOpacity = e.target.value; for (const layerName in overlayLayers) { const layer = overlayLayers[layerName]; if (map.hasLayer(layer) && typeof layer.setOpacity === 'function') { layer.setOpacity(newOpacity); } } });
+            
+            window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; }
             document.getElementById('locate-btn').onclick = locateFromInput;
-            window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; };
+            window.onclick = (event) => { if (event.target.classList.contains('modal')) event.target.style.display = "none"; };
 
             // --- 8. FUNÇÕES AUXILIARES ---
             function bindDownloadPopup(layer) {
                 let content = '<h4>Exportar Geometria</h4>';
                 if (layer instanceof L.Polygon) {
                     const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
-                    content += `<p><b>Área (ROI):</b> ${area.toFixed(2)} m²</p>`;
+                    const perimeter = calculatePerimeter(layer.getLatLngs()[0]);
+                    content += `<p><b>Área (ROI):</b> ${area.toFixed(2)} m²</p><p><b>Perímetro:</b> ${perimeter.toFixed(2)} m</p>`;
+                } else if (layer instanceof L.Polyline) {
+                    const distance = calculatePerimeter(layer.getLatLngs());
+                    content += `<p><b>Distância:</b> ${distance.toFixed(2)} m</p>`;
                 }
                 const featureId = L.Util.stamp(layer);
-                content += `<button class="download-button" onclick="downloadGeoJSON(${featureId})">GeoJSON</button>`;
-                content += `<button class="download-button" onclick="downloadKML(${featureId})">KML</button>`;
+                content += `<button class="popup-button" onclick="downloadGeoJSON(${featureId})">GeoJSON</button>`;
+                content += `<button class="popup-button" onclick="downloadKML(${featureId})">KML</button>`;
+                content += `<button class="popup-button" onclick="downloadCSV(${featureId})">CSV</button>`;
+                if (layer instanceof L.Polyline) {
+                    content += `<button class="popup-button share" onclick="openGoogleMapsRoute(${featureId})">Abrir Google Rotas</button>`;
+                }
                 layer.bindPopup(content).openPopup();
             }
+
+            function calculatePerimeter(latlngs) { let distance = 0; for (let i = 0; i < latlngs.length - 1; i++) { distance += latlngs[i].distanceTo(latlngs[i+1]); } if (latlngs.length > 2 && !latlngs[0].equals(latlngs[latlngs.length - 1])) { distance += latlngs[latlngs.length - 1].distanceTo(latlngs[0]); } return distance; }
             
-            window.downloadGeoJSON = function(layerId) {
-                const layer = drawnItems.getLayer(layerId);
-                const geojson = layer.toGeoJSON();
-                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(geojson));
-                const downloadAnchorNode = document.createElement('a');
-                downloadAnchorNode.setAttribute("href", dataStr);
-                downloadAnchorNode.setAttribute("download", `feature_${layerId}.geojson`);
-                document.body.appendChild(downloadAnchorNode);
-                downloadAnchorNode.click();
-                downloadAnchorNode.remove();
-            }
-
-            window.downloadKML = function(layerId) {
-                const layer = drawnItems.getLayer(layerId);
-                const kmlString = toKML(layer);
-                const dataStr = "data:application/vnd.google-earth.kml+xml;charset=utf-8," + encodeURIComponent(kmlString);
-                const downloadAnchorNode = document.createElement('a');
-                downloadAnchorNode.setAttribute("href", dataStr);
-                downloadAnchorNode.setAttribute("download", `feature_${layerId}.kml`);
-                document.body.appendChild(downloadAnchorNode);
-                downloadAnchorNode.click();
-                downloadAnchorNode.remove();
-            }
-
-            function toKML(layer) {
-                let kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><Placemark>';
-                const geojson = layer.toGeoJSON();
-                const coords = geojson.geometry.coordinates;
-
-                if (geojson.geometry.type === 'Point') {
-                    kml += `<Point><coordinates>${coords[0]},${coords[1]},0</coordinates></Point>`;
-                } else if (geojson.geometry.type === 'Polygon') {
-                    kml += '<Polygon><outerBoundaryIs><LinearRing><coordinates>';
-                    coords[0].forEach(p => { kml += `${p[0]},${p[1]},0 `; });
-                    kml += '</coordinates></LinearRing></outerBoundaryIs></Polygon>';
-                }
-                kml += '</Placemark></Document></kml>';
-                return kml;
-            }
-
-            function locateFromInput() {
-                const input = document.getElementById('coord-input').value.trim();
-                const coords = input.split(/[\s,;]+/).map(Number);
-                if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) { alert("Formato de coordenada inválido."); return; }
-                let lat, lon;
-                if (Math.abs(coords[0]) > 180 || Math.abs(coords[1]) > 180) { const utmResult = utmToLatLon(24, coords[0], coords[1], false); lat = utmResult.lat; lon = utmResult.lon; } 
-                else { lat = coords[0]; lon = coords[1]; }
-                if (locatedMarker) map.removeLayer(locatedMarker);
-                locatedMarker = L.marker([lat, lon]).addTo(map);
-                map.setView([lat, lon], 15);
-                modal.style.display = 'none';
-            }
-            
+            window.openGoogleMapsRoute = function(layerId) { const layer = drawnItems.getLayer(layerId); let url = 'https://www.google.com/maps/dir/'; if (layer instanceof L.Polyline) { const coords = layer.getLatLngs(); if (coords.length > 0) { coords.forEach(latlng => { url += `${latlng.lat},${latlng.lng}/`; }); window.open(url, '_blank'); } } }
+            window.downloadGeoJSON = function(layerId) { const layer = drawnItems.getLayer(layerId); const geojson = layer.toGeoJSON(); const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(geojson)); const downloadAnchorNode = document.createElement('a'); downloadAnchorNode.setAttribute("href", dataStr); downloadAnchorNode.setAttribute("download", `feature_${layerId}.geojson`); document.body.appendChild(downloadAnchorNode); downloadAnchorNode.click(); downloadAnchorNode.remove(); }
+            window.downloadKML = function(layerId) { const layer = drawnItems.getLayer(layerId); const kmlString = toKML(layer); const dataStr = "data:application/vnd.google-earth.kml+xml;charset=utf-8," + encodeURIComponent(kmlString); const downloadAnchorNode = document.createElement('a'); downloadAnchorNode.setAttribute("href", dataStr); downloadAnchorNode.setAttribute("download", `feature_${layerId}.kml`); document.body.appendChild(downloadAnchorNode); downloadAnchorNode.click(); downloadAnchorNode.remove(); }
+            window.downloadCSV = function(layerId) { const layer = drawnItems.getLayer(layerId); let coords = []; if (layer instanceof L.Polygon) { coords = layer.getLatLngs()[0]; } else if (layer instanceof L.Polyline) { coords = layer.getLatLngs(); } else if (layer instanceof L.Marker) { coords = [layer.getLatLng()]; } let csvContent = "data:text/csv;charset=utf-8,Latitude,Longitude,Easting,Northing,Fuso\n"; coords.forEach(latlng => { const utm = latLonToUTM(latlng.lat, latlng.lng, 24); const row = `${latlng.lat.toFixed(6)},${latlng.lng.toFixed(6)},${utm.easting.toFixed(2)},${utm.northing.toFixed(2)},"${utm.zoneNum}${utm.zoneLetter}"`; csvContent += row + "\n"; }); const encodedUri = encodeURI(csvContent); const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", `feature_${layerId}_coords.csv`); document.body.appendChild(link); link.click(); link.remove(); }
+            function toKML(layer) { let kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><Placemark>'; const geojson = layer.toGeoJSON(); const coords = geojson.geometry.coordinates; if (geojson.geometry.type === 'Point') { kml += `<Point><coordinates>${coords[0]},${coords[1]},0</coordinates></Point>`; } else if (geojson.geometry.type === 'Polygon') { kml += '<Polygon><outerBoundaryIs><LinearRing><coordinates>'; coords[0].forEach(p => { kml += `${p[0]},${p[1]},0 `; }); kml += '</coordinates></LinearRing></outerBoundaryIs></Polygon>'; } else if (geojson.geometry.type === 'LineString') { kml += '<LineString><coordinates>'; coords.forEach(p => { kml += `${p[0]},${p[1]},0 `; }); kml += '</coordinates></LineString>'; } kml += '</Placemark></Document></kml>'; return kml; }
+            function locateFromInput() { const input = document.getElementById('coord-input').value.trim(); const coords = input.split(/[\s,;]+/).map(Number); if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) { alert("Formato inválido."); return; } let lat, lon; if (Math.abs(coords[0]) > 180 || Math.abs(coords[1]) > 180) { const utmResult = utmToLatLon(24, coords[0], coords[1], false); lat = utmResult.lat; lon = utmResult.lon; } else { lat = coords[0]; lon = coords[1]; } if (locatedMarker) map.removeLayer(locatedMarker); locatedMarker = L.marker([lat, lon]).addTo(map); map.setView([lat, lon], 15); closeModal('locate-modal'); }
             function utmToLatLon(zone, easting, northing, northernHemisphere) { const k0 = 0.9996; const a = 6378137.0; const f = 1 / 298.257223563; const e2 = 2 * f - f * f; const e_2 = e2 / (1 - e2); const n = (a - a * Math.sqrt(1 - e2)) / (a + a * Math.sqrt(1 - e2)); const M0 = 0; const M = M0 + (northing - (northernHemisphere ? 0 : 10000000.0)) / k0; const mu = M / (a * (1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 * e2 * e2 / 256)); const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2)); const lat1 = mu + (3 * e1 / 2 - 27 * e1 * e1 * e1 / 32) * Math.sin(2 * mu) + (21 * e1 * e1 / 16 - 55 * e1 * e1 * e1 * e1 / 32) * Math.sin(4 * mu) + (151 * e1 * e1 * e1 / 96) * Math.sin(6 * mu); const C1 = e_2 * Math.pow(Math.cos(lat1), 2); const T1 = Math.pow(Math.tan(lat1), 2); const N1 = a / Math.sqrt(1 - e2 * Math.pow(Math.sin(lat1), 2)); const R1 = N1 * (1 - e2) / (1 - e2 * Math.pow(Math.sin(lat1), 2)); const D = (easting - 500000) / (N1 * k0); let lat = lat1 - (N1 * Math.tan(lat1) / R1) * (D * D / 2 - (5 + 3 * T1 + 10 * C1 - 4 * C1 * C1 - 9 * e_2) * D * D * D * D / 24 + (61 + 90 * T1 + 298 * C1 + 45 * T1 * T1 - 252 * e_2 - 3 * C1 * C1) * D * D * D * D * D * D / 720); let lon = (D - (1 + 2 * T1 + C1) * D * D * D / 6 + (5 - 2 * C1 + 28 * T1 - 3 * C1 * C1 + 8 * e_2 + 24 * T1 * T1) * D * D * D * D * D / 120) / Math.cos(lat1); const lon_cen = (zone - 1) * 6 - 180 + 3; return { lat: lat * 180 / Math.PI, lon: lon_cen + lon * 180 / Math.PI }; }
             function latLonToUTM(lat, lon, zone) { const deg2rad = Math.PI / 180; const a = 6378137.0; const f = 1 / 298.257223563; const k0 = 0.9996; const e2 = 2 * f - f * f; const e_2 = e2 / (1.0 - e2); const lon_rad = lon * deg2rad; const lat_rad = lat * deg2rad; const zoneNum = zone; const lon_cen = (zoneNum - 1) * 6 - 180 + 3; const lon_cen_rad = lon_cen * deg2rad; const T = Math.pow(Math.tan(lat_rad), 2); const C = e_2 * Math.pow(Math.cos(lat_rad), 2); const A = (lon_rad - lon_cen_rad) * Math.cos(lat_rad); const N = a / Math.sqrt(1 - e2 * Math.pow(Math.sin(lat_rad), 2)); const M = a * ((1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 * e2 * e2 / 256) * lat_rad - (3 * e2 / 8 + 3 * e2 * e2 / 32 + 45 * e2 * e2 * e2 / 1024) * Math.sin(2 * lat_rad) + (15 * e2 * e2 / 256 + 45 * e2 * e2 * e2 / 1024) * Math.sin(4 * lat_rad) - (35 * e2 * e2 * e2 / 3072) * Math.sin(6 * lat_rad)); const M0 = 0; const easting = k0 * N * (A + (1 - T + C) * Math.pow(A, 3) / 6 + (5 - 18 * T + T * T + 72 * C - 58 * e_2) * Math.pow(A, 5) / 120) + 500000.0; let northing = k0 * (M - M0 + N * Math.tan(lat_rad) * (A * A / 2 + (5 - T + 9 * C + 4 * C * C) * Math.pow(A, 4) / 24 + (61 - 58 * T + T * T + 600 * C - 330 * e_2) * Math.pow(A, 6) / 720)); if (lat < 0) northing += 10000000.0; const zoneLetters = "CDEFGHJKLMNPQRSTUVWXX"; const zoneLetter = zoneLetters[Math.floor((lat + 80) / 8)]; return { easting: easting, northing: northing, zoneNum: zoneNum, zoneLetter: zoneLetter }; }
         };
