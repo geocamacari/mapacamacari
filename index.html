@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mapa Interativo de Camaçari</title>
+    <title>Mapa Interativo de Camaçari - v20</title>
 
     <!-- === DEPENDÊNCIAS (CSS) === -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-geosearch@3.11.0/dist/geosearch.css"/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
 
     <style>
         /* Estilo base com gradiente */
@@ -38,6 +39,9 @@
             line-height: 1.5;
             width: 30px;
             height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .leaflet-control-custom a:hover, .leaflet-draw a:hover, .leaflet-control-custom button:hover {
             background-color: #e67e22 !important;
@@ -51,13 +55,25 @@
             border-radius: 8px !important;
             border: 1px solid #c8a2c8 !important;
         }
+        
         .leaflet-popup-content-wrapper {
-            background: rgba(255, 255, 255, 0.95) !important; backdrop-filter: blur(4px); border-radius: 8px; box-shadow: 0 3px 14px rgba(0,0,0,0.4) !important;
+            background: #e6e6fa !important;
+            color: #333 !important;
+            border-radius: 8px; 
+            box-shadow: 0 3px 14px rgba(0,0,0,0.4) !important;
         }
+        .leaflet-popup-tip {
+            background: #e6e6fa !important;
+        }
+        .leaflet-popup-content h4 { color: #8e44ad; }
+        .leaflet-popup-content a { color: #8e44ad; font-weight: bold; }
+        .leaflet-popup-content .popup-button { background-color: #8e44ad; color: white; }
+
+
         .coords-popup-content { font-size: 0.9em; line-height: 1.5; }
         .coords-popup-content h4 { margin: 0 0 5px 0; font-size: 1.1em; color: #8e44ad; }
         .coords-popup-content p { margin: 2px 0; }
-        .coords-popup-content a { color: #8e44ad; text-decoration: none; font-weight: bold; display: block; margin-top: 5px; }
+        .coords-popup-content a { text-decoration: none; display: block; margin-top: 5px; }
         .coords-popup-content a:hover { text-decoration: underline; }
         
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
@@ -73,7 +89,6 @@
         
         .popup-button { background-color: #16a085; color: white; border: none; padding: 5px 10px; margin: 5px 2px 0 2px; border-radius: 4px; cursor: pointer; font-size: 0.9em; }
         .popup-button:hover { opacity: 0.9; }
-        .popup-button.share { background-color: #8e44ad; }
 
         #labels-panel {
             position: absolute;
@@ -99,13 +114,17 @@
         .panel-btn:hover { background-color: #e67e22; }
         
         .leaflet-control-opacity {
-            background-color: #e6e6fa; /* Lilás */
+            background-color: #e6e6fa;
             padding: 10px;
             border-radius: 5px;
             box-shadow: 0 1px 5px rgba(0,0,0,0.65);
         }
         .leaflet-control-opacity label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
         .leaflet-control-opacity input[type="range"] { width: 120px; }
+
+        .leaflet-routing-container {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -132,7 +151,6 @@
     <div id="locate-modal" class="modal"><div class="modal-content"><span class="close-button" onclick="closeModal('locate-modal')">&times;</span><h4>Localizar por Coordenada</h4><p style="font-size: 0.8em; color: #555;">Cole Lat/Lon (ex: -12.7, -38.3) ou UTM (ex: 575123, 8596345)</p><input type="text" id="coord-input" placeholder="Insira as coordenadas aqui..."><button id="locate-btn">Localizar</button></div></div>
     <div id="label-modal" class="modal"><div class="modal-content"><span class="close-button" onclick="closeModal('label-modal')">&times;</span><h4>Adicionar Etiqueta</h4><input type="text" id="label-name-input" placeholder="Nome do local..."><input type="text" id="label-type-input" placeholder="Tipo (ex: Escola, Comércio)"><button id="save-label-btn">Salvar</button></div></div>
     
-    <!-- [NOVO] Input de arquivo oculto -->
     <input type="file" id="file-input" style="display: none;" accept=".kml,.geojson,.json,.csv">
 
 
@@ -143,8 +161,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/leaflet-geometryutil@0.9.3/src/leaflet.geometryutil.js"></script>
     <script src="https://unpkg.com/esri-leaflet@3.0.10/dist/esri-leaflet.js"></script>
-    <!-- [NOVO] togeojson para converter KML -->
     <script src="https://unpkg.com/@tmcw/togeojson@4.7.0/dist/togeojson.umd.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
 
     <script>
@@ -154,9 +172,11 @@
             const initialZoom = 15;
             const map = L.map('map', { center: initialCoords, zoom: initialZoom });
             let locatedMarker = null;
-            let activeTool = null; // null, 'buffer', 'label', 'draw'
+            let activeTool = null; // 'buffer', 'label', 'draw', 'route'
             let customLabels = [];
             let tempLabelLatLng = null;
+            let currentRoute = null;
+            let routePoints = [];
 
             const camaçariGeoJSON = { "type": "Polygon", "coordinates": [[[-38.331, -12.512], [-38.263, -12.535], [-38.223, -12.528], [-38.187, -12.545], [-38.163, -12.522], [-38.127, -12.541], [-38.077, -12.538], [-38.062, -12.592], [-38.019, -12.639], [-37.962, -12.698], [-38.001, -12.759], [-38.043, -12.784], [-38.086, -12.827], [-38.161, -12.845], [-38.224, -12.841], [-38.279, -12.872], [-38.349, -12.835], [-38.356, -12.783], [-38.411, -12.748], [-38.423, -12.68], [-38.448, -12.62], [-38.394, -12.584], [-38.331, -12.512]]] };
             const mapBounds = L.geoJSON(camaçariGeoJSON).getBounds().pad(0.1); 
@@ -166,6 +186,7 @@
             // --- 2. CAMADAS ---
             const baseLayers = {
                 '<b>Padrão (Ruas)</b>': L.tileLayer.provider('OpenStreetMap.Mapnik'),
+                '<b>Satélite (Google)</b>': L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{ maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'], attribution: 'Google' }),
                 '<b>Satélite (Imagens Aéreas)</b>': L.tileLayer.provider('Esri.WorldImagery'),
                 '<b>ESRI Topo</b>': L.tileLayer.provider('Esri.WorldTopoMap'),
                 '<b>Relevo (ESRI)</b>': L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' }),
@@ -173,56 +194,70 @@
             };
             
             const overlayLayers = {
+                '<b>Rótulos (Google)</b>': L.tileLayer('https://{s}.google.com/vt/lyrs=h&x={x}&y={y}&z={z}',{ maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'], pane: 'overlayPane', attribution: 'Google' }),
+                '<b>Tráfego (Google)</b>': L.tileLayer('https://{s}.google.com/vt/lyrs=m@221097413,traffic&x={x}&y={y}&z={z}',{ maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'], pane: 'overlayPane', attribution: 'Google' }),
                 '<b>Topografia (OpenTopoMap)</b>': L.tileLayer.provider('OpenTopoMap', { pane: 'overlayPane' }),
                 '<b>Limites e Locais (ESRI)</b>': L.esri.dynamicMapLayer({ url: 'https://services.arcgisonline.com/arcgis/rest/services/Reference/World_Boundaries_and_Places/MapServer', pane: 'overlayPane' }),
-                '<b>Satélite (Google)</b>': L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{ maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'], pane: 'overlayPane', attribution: 'Google' }),
                 '<b>Ciclovias (CyclOSM)</b>': L.tileLayer.provider('CyclOSM', { pane: 'overlayPane' }),
                 '<b>Limites Municipais (IBGE)</b>': L.esri.featureLayer({ url: 'https://services6.arcgis.com/uaRkpyZiQH3wzm7O/arcgis/rest/services/LIM_PerfilMunicipal_AAS_IBGE2022/FeatureServer/21', pane: 'overlayPane', attribution: 'IBGE', style: { color: '#8e44ad', weight: 1.5 } })
             };
             
             baseLayers['<b>Padrão (Ruas)</b>'].addTo(map);
-
-            // --- 3. CONTROLES ---
-            L.control.layers(baseLayers, overlayLayers, { collapsed: true }).addTo(map);
-            L.marker([-12.7059, -38.3197]).addTo(map).bindPopup('<b>Camaçari, BA</b><br>(Um Gigante Metropolitano)<br><a href="https://pt.wikipedia.org/wiki/Camaçari" target="_blank">Ver na Wikipedia</a>').openPopup();
+            overlayLayers['<b>Limites e Locais (ESRI)</b>'].addTo(map);
 
             const drawnItems = new L.FeatureGroup();
             map.addLayer(drawnItems);
+            
+            // --- 3. CONTROLES ---
+            L.control.layers(baseLayers, overlayLayers, { collapsed: true }).addTo(map);
+            L.marker([-12.7059, -38.3197]).addTo(map).bindPopup('<b>Camaçari, BA</b><br>(Um Gigante Metropolitano)<br><a href="https://pt.wikipedia.org/wiki/Camaçari" target="_blank">Ver na Wikipedia</a>').openPopup();
             
             const drawControl = new L.Control.Draw({ position: 'topright', draw: { polygon: { shapeOptions: { color: 'purple' } }, polyline: { shapeOptions: { color: 'blue' } }, marker: true, rectangle: false, circle: false, circlemarker: false }, edit: { featureGroup: drawnItems } });
             map.addControl(drawControl);
 
             L.control.scale({ imperial: false, metric: true }).addTo(map);
             map.addControl(new GeoSearch.GeoSearchControl({ provider: new GeoSearch.OpenStreetMapProvider(), style: 'bar', autoClose: true, keepResult: true, searchLabel: 'Buscar endereço...' }));
-            map.addControl(new (L.Control.extend({ onAdd: function(map) { const container = L.DomUtil.create('div', 'leaflet-control-opacity leaflet-bar'); container.innerHTML = `<label for="opacity-slider">Opacidade das Camadas</label><input id="opacity-slider" type="range" min="0" max="1" step="0.1" value="1">`; L.DomEvent.disableClickPropagation(container); return container; } }))({ position: 'topright' }));
+            map.addControl(new (L.Control.extend({ onAdd: function(map) { const container = L.DomUtil.create('div', 'leaflet-control-opacity leaflet-bar'); container.innerHTML = `<label for="opacity-slider">Opacidade</label><input id="opacity-slider" type="range" min="0" max="1" step="0.1" value="1">`; L.DomEvent.disableClickPropagation(container); return container; } }))({ position: 'topright' }));
             map.addControl(new (L.Control.extend({ onAdd: (map) => { const container = L.DomUtil.create('div', 'leaflet-control-custom leaflet-bar'); const link = L.DomUtil.create('a', '', container); link.href = '#'; link.title = 'Encontrar minha localização'; link.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i>'; L.DomEvent.on(link, 'click', L.DomEvent.stop).on(link, 'click', () => map.locate({ setView: true, maxZoom: 16 })); return container; } }))({ position: 'topleft' }));
             map.addControl(new (L.Control.extend({ onAdd: (map) => { const container = L.DomUtil.create('div', 'leaflet-control-custom leaflet-bar'); const link = L.DomUtil.create('a', '', container); link.href = '#'; link.title = 'Voltar à visualização inicial'; link.innerHTML = '<i class="fa-solid fa-house"></i>'; L.DomEvent.on(link, 'click', L.DomEvent.stop).on(link, 'click', () => map.setView(initialCoords, initialZoom)); return container; } }))({ position: 'topleft' }));
             map.addControl(new (L.Control.extend({ onAdd: (map) => { const container = L.DomUtil.create('div', 'leaflet-control-custom leaflet-bar'); const link = L.DomUtil.create('a', '', container); link.href = '#'; link.title = 'Localizar por Coordenada'; link.innerHTML = '<i class="fa-solid fa-magnifying-glass-location"></i>'; L.DomEvent.on(link, 'click', L.DomEvent.stop).on(link, 'click', () => { document.getElementById('locate-modal').style.display = 'block'; }); return container; } }))({position: 'topleft'}));
-
-            // Ferramentas de Análise
+            
             const BufferControl = L.Control.extend({ onAdd: (map) => { const button = L.DomUtil.create('button', 'leaflet-control-custom'); button.innerHTML = '<i class="fa-solid fa-bullseye"></i>'; button.title = 'Criar Buffer'; L.DomEvent.on(button, 'click', L.DomEvent.stop).on(button, 'click', () => toggleTool('buffer', button)); return button; } });
             map.addControl(new BufferControl({position: 'topright'}));
 
             const LabelControl = L.Control.extend({ onAdd: (map) => { const button = L.DomUtil.create('button', 'leaflet-control-custom'); button.innerHTML = '<i class="fa-solid fa-tags"></i>'; button.title = 'Adicionar Etiquetas'; L.DomEvent.on(button, 'click', L.DomEvent.stop).on(button, 'click', () => toggleTool('label', button)); return button; } });
             map.addControl(new LabelControl({position: 'topright'}));
             
-            // [NOVO] Botão de Reset
+            const RouteControl = L.Control.extend({ onAdd: (map) => { const button = L.DomUtil.create('button', 'leaflet-control-custom'); button.innerHTML = '<i class="fa-solid fa-route"></i>'; button.title = 'Gerar Rota'; L.DomEvent.on(button, 'click', L.DomEvent.stop).on(button, 'click', () => toggleTool('route', button)); return button; } });
+            map.addControl(new RouteControl({position: 'topright'}));
+
             const ResetControl = L.Control.extend({ onAdd: (map) => { const container = L.DomUtil.create('div', 'leaflet-control-custom leaflet-bar'); const link = L.DomUtil.create('a', '', container); link.href = '#'; link.title = 'Resetar Mapa'; link.innerHTML = '<i class="fa-solid fa-arrow-rotate-left"></i>'; L.DomEvent.on(link, 'click', L.DomEvent.stop).on(link, 'click', () => location.reload()); return container; } });
             map.addControl(new ResetControl({ position: 'topleft' }));
 
-            // [NOVO] Botão de Importar Arquivo
             const ImportControl = L.Control.extend({ onAdd: (map) => { const container = L.DomUtil.create('div', 'leaflet-control-custom leaflet-bar'); const link = L.DomUtil.create('a', '', container); link.href = '#'; link.title = 'Importar Arquivo (KML, GeoJSON, CSV)'; link.innerHTML = '<i class="fa-solid fa-file-import"></i>'; L.DomEvent.on(link, 'click', L.DomEvent.stop).on(link, 'click', () => document.getElementById('file-input').click()); return container; } });
             map.addControl(new ImportControl({ position: 'topleft' }));
-
 
             // --- 4. EVENTOS ---
             map.on('draw:drawstart draw:editstart draw:deletestart', function() { activeTool = 'draw'; document.querySelectorAll('.leaflet-control-custom button').forEach(b => b.classList.remove('active')); map.getContainer().style.cursor = ''; });
             map.on('draw:drawstop draw:editstop draw:deletestop', function() { setTimeout(() => { activeTool = null; }, 100); });
-            map.on(L.Draw.Event.CREATED, function (e) { drawnItems.addLayer(e.layer); bindDownloadPopup(e.layer); });
-
-            map.on('contextmenu', function(e) { if (activeTool) return; L.DomEvent.preventDefault(e.originalEvent); const lat = e.latlng.lat; const lng = e.latlng.lng; const utmCoords = latLonToUTM(lat, lng, 24); const googleMapsLink = `https://www.google.com/maps?q=${lat},${lng}`; const googleStreetViewLink = `https://www.google.com/maps?q=&layer=c&cbll=${lat},${lng}`; L.popup().setLatLng(e.latlng).setContent(`<div class="coords-popup-content"><h4>Informações do Ponto</h4><p><b>Latitude:</b> ${lat.toFixed(6)}</p><p><b>Longitude:</b> ${lng.toFixed(6)}</p><hr><p><b>UTM (SIRGAS 2000 / Fuso 24S)</b></p><p><b>E:</b> ${utmCoords.easting.toFixed(2)}</p><p><b>N:</b> ${utmCoords.northing.toFixed(2)}</p><p><b>Fuso:</b> ${utmCoords.zoneNum} ${utmCoords.zoneLetter}</p><hr><a href="${googleMapsLink}" target="_blank">Abrir no Google Maps</a><a href="${googleStreetViewLink}" target="_blank">Ver no Street View</a></div>`).openOn(map); });
-            map.on('click', function(e) { if (activeTool === 'buffer') createBuffer(e); else if (activeTool === 'label') startAddLabel(e); });
             
+            map.on(L.Draw.Event.CREATED, function (e) {
+                const layer = e.layer;
+                const name = prompt("Identifique a nova feição:", `Feição-${L.Util.stamp(layer)}`);
+                if (name) {
+                    if (!layer.feature) layer.feature = {};
+                    layer.feature.properties = { name: name };
+                    drawnItems.addLayer(layer);
+                    bindFeaturePopup(layer);
+                }
+            });
+
+            map.on('click', function(e) { 
+                if (activeTool === 'buffer') createBuffer(e);
+                else if (activeTool === 'label') startAddLabel(e);
+            });
+
+            map.on('contextmenu', function(e) { if (activeTool) return; L.DomEvent.preventDefault(e.originalEvent); const lat = e.latlng.lat; const lng = e.latlng.lng; const utmCoords = latLonToUTM(lat, lng, 24); const googleMapsLink = `https://www.google.com/maps?q=${lat},${lng}`; const googleStreetViewLink = `https://www.google.com/maps?q=&layer=c&cbll=${lat},${lng}`; const coordsText = `${lat.toFixed(6)}, ${lng.toFixed(6)}`; L.popup().setLatLng(e.latlng).setContent(`<div class="coords-popup-content"><h4>Informações do Ponto</h4><p><b>Latitude:</b> ${lat.toFixed(6)}</p><p><b>Longitude:</b> ${lng.toFixed(6)}</p><hr><p><b>UTM (SIRGAS 2000 / Fuso 24S)</b></p><p><b>E:</b> ${utmCoords.easting.toFixed(2)}</p><p><b>N:</b> ${utmCoords.northing.toFixed(2)}</p><p><b>Fuso:</b> ${utmCoords.zoneNum} ${utmCoords.zoneLetter}</p><hr><a href="${googleMapsLink}" target="_blank">Abrir no Google Maps</a><a href="${googleStreetViewLink}" target="_blank">Ver no Street View</a><button class="popup-button" style="margin-top: 5px;" onclick="copyCoordsToClipboard('${coordsText}')">Copiar Coordenadas</button></div>`).openOn(map); });
             map.on('locationfound', e => L.marker(e.latlng).addTo(map).bindPopup("Você está aqui!").openPopup());
             map.on('locationerror', e => L.popup().setLatLng(map.getCenter()).setContent("<b>Não foi possível obter sua localização.</b>").openOn(map));
             
@@ -236,26 +271,164 @@
             window.onclick = (event) => { if (event.target.classList.contains('modal')) event.target.style.display = "none"; };
 
             // --- 5. FUNÇÕES AUXILIARES E NOVAS ---
-            function toggleTool(toolName, button) { const isActive = button.classList.contains('active'); document.querySelectorAll('.leaflet-control-custom button').forEach(b => b.classList.remove('active')); map.getContainer().style.cursor = ''; if(activeTool === 'label') document.getElementById('labels-panel').style.display = 'none'; activeTool = null; if(!isActive) { activeTool = toolName; button.classList.add('active'); map.getContainer().style.cursor = toolName === 'buffer' ? 'crosshair' : 'pointer'; if(toolName === 'label') document.getElementById('labels-panel').style.display = 'flex'; } }
-            function createBuffer(e) { const radius = prompt("Digite o raio do buffer em metros:", 100); if (radius && !isNaN(radius)) { const buffer = L.circle(e.latlng, { radius: parseFloat(radius), color: '#f39c12', weight: 2 }).addTo(drawnItems); bindDownloadPopup(buffer); } }
+            function toggleTool(toolName, button) {
+                const isActive = button.classList.contains('active');
+                
+                document.querySelectorAll('.leaflet-control-custom button').forEach(b => b.classList.remove('active'));
+                map.getContainer().style.cursor = '';
+                if (activeTool === 'label') {
+                    document.getElementById('labels-panel').style.display = 'none';
+                }
+                if (currentRoute) {
+                    map.removeControl(currentRoute);
+                    currentRoute = null;
+                }
+                map.off('click', handleRouteClick);
+                activeTool = null;
+
+                if (!isActive) {
+                    activeTool = toolName;
+                    button.classList.add('active');
+                    if (toolName === 'label') {
+                        document.getElementById('labels-panel').style.display = 'flex';
+                        map.getContainer().style.cursor = 'pointer';
+                    } else if (toolName === 'buffer') {
+                        map.getContainer().style.cursor = 'crosshair';
+                    } else if (toolName === 'route') {
+                        alert('Ferramenta de Rota ativada. Clique em 2 pontos no mapa para gerar a rota. Clique no botão de rota novamente para limpar.');
+                        map.on('click', handleRouteClick);
+                    }
+                }
+            }
+            
+            function handleRouteClick(e) {
+                routePoints.push(e.latlng);
+                L.marker(e.latlng).addTo(drawnItems);
+
+                if (routePoints.length === 2) {
+                    map.off('click', handleRouteClick);
+                    const [start, end] = routePoints;
+
+                    currentRoute = L.Routing.control({
+                        waypoints: [start, end],
+                        show: false,
+                        addWaypoints: false,
+                        createMarker: () => null,
+                        lineOptions: {
+                            styles: [{color: 'blue', opacity: 0.8, weight: 5}]
+                        }
+                    }).on('routesfound', function(e) {
+                        const routes = e.routes;
+                        if (routes && routes.length > 0) {
+                            const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${start.lat},${start.lng}&destination=${end.lat},${end.lng}`;
+                            const routeLine = L.Routing.line(routes[0]);
+                            drawnItems.addLayer(routeLine);
+                            routeLine.bindPopup(`<a href="${googleMapsUrl}" target="_blank">Abrir rota no Google Maps</a>`).openPopup();
+                        } else {
+                            alert("Não foi possível encontrar uma rota.");
+                        }
+                    }).on('routingerror', function(e) {
+                        alert("Erro ao calcular a rota.");
+                    }).addTo(map);
+
+                    const routeButton = document.querySelector('button[title="Gerar Rota"]');
+                    if (routeButton) routeButton.classList.remove('active');
+                    activeTool = null;
+                    map.getContainer().style.cursor = '';
+                    routePoints = [];
+                }
+            }
+
+            window.copyCoordsToClipboard = function(text) {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert('Coordenadas copiadas para a área de transferência!');
+                } catch (err) {
+                    console.error('Falha ao copiar texto: ', err);
+                    alert('Não foi possível copiar as coordenadas.');
+                }
+                document.body.removeChild(textArea);
+            }
+
+            function createBuffer(e) { const radius = prompt("Digite o raio do buffer em metros:", 100); if (radius && !isNaN(radius)) { const buffer = L.circle(e.latlng, { radius: parseFloat(radius), color: '#f39c12', weight: 2 }); drawnItems.addLayer(buffer); bindFeaturePopup(buffer); } }
+            
             function startAddLabel(e) { tempLabelLatLng = e.latlng; document.getElementById('label-modal').style.display = 'block'; }
-            function saveLabel() { const name = document.getElementById('label-name-input').value || 'Sem nome'; const type = document.getElementById('label-type-input').value || 'Geral'; if(tempLabelLatLng) { const labelData = { latlng: tempLabelLatLng, name: name, type: type }; const marker = L.marker(tempLabelLatLng, { icon: L.divIcon({className: 'fa-solid fa-tags', html: `<i class="fa-solid fa-tag" style="color: ${'#'+Math.floor(Math.random()*16777215).toString(16)}; font-size: 24px;"></i>`, iconSize: [24, 24] }) }).addTo(drawnItems); marker.bindPopup(`<b>${name}</b><br>Tipo: ${type}`); customLabels.push({ ...labelData, marker }); updateLabelsPanel(); } closeModal('label-modal'); }
+            
+            function saveLabel() { const name = document.getElementById('label-name-input').value || 'Sem nome'; const type = document.getElementById('label-type-input').value || 'Geral'; if(tempLabelLatLng) { const labelData = { latlng: tempLabelLatLng, name: name, type: type }; const marker = L.marker(tempLabelLatLng, { icon: L.divIcon({className: 'fa-solid fa-tags', html: `<i class="fa-solid fa-tag" style="color: #006400; font-size: 24px;"></i>`, iconSize: [24, 24] }) }); marker.bindPopup(`<b>${name}</b><br>Tipo: ${type}`); customLabels.push({ ...labelData, marker }); drawnItems.addLayer(marker); updateLabelsPanel(); } closeModal('label-modal'); }
+            
             function updateLabelsPanel() { const list = document.getElementById('labels-list'); list.innerHTML = ''; customLabels.forEach((label, index) => { const li = document.createElement('li'); li.innerHTML = `<span>${index + 1}: ${label.name} (${label.type})</span><span class="delete-label" onclick="deleteLabel(${index})">&times;</span>`; li.onclick = (e) => { if(e.target.tagName !== 'SPAN') { map.setView(label.latlng, 16); label.marker.openPopup(); }}; list.appendChild(li); }); }
-            window.deleteLabel = function(index) { event.stopPropagation(); const labelToRemove = customLabels[index]; map.removeLayer(labelToRemove.marker); customLabels.splice(index, 1); updateLabelsPanel(); }
+            
+            window.deleteLabel = function(index) { event.stopPropagation(); const labelToRemove = customLabels[index]; drawnItems.removeLayer(labelToRemove.marker); customLabels.splice(index, 1); updateLabelsPanel(); }
+            
             function exportAllLabels() { if(customLabels.length === 0) { alert("Nenhuma etiqueta para exportar."); return; } const allFeatures = { "type": "FeatureCollection", "features": customLabels.map(l => { const f = l.marker.toGeoJSON(); f.properties = { name: l.name, type: l.type }; return f; })}; downloadData(JSON.stringify(allFeatures), 'etiquetas.geojson', 'text/json'); downloadData(toKML(customLabels), 'etiquetas.kml', 'application/vnd.google-earth.kml+xml'); downloadData(toCSV(customLabels), 'etiquetas.csv', 'text/csv'); }
             
-            function bindDownloadPopup(layer) { let content = '<h4>Exportar Geometria</h4>'; if (layer instanceof L.Polygon) { const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]); const perimeter = calculatePerimeter(layer.getLatLngs()[0]); content += `<p><b>Área (ROI):</b> ${area.toFixed(2)} m²</p><p><b>Perímetro:</b> ${perimeter.toFixed(2)} m</p>`; } else if (layer instanceof L.Polyline) { const distance = calculatePerimeter(layer.getLatLngs()); content += `<p><b>Distância:</b> ${distance.toFixed(2)} m</p>`; } else if(layer instanceof L.Circle) { content += `<p><b>Raio:</b> ${layer.getRadius().toFixed(2)} m</p><p><b>Área:</b> ${(Math.PI * Math.pow(layer.getRadius(), 2)).toFixed(2)} m²</p>`; } const featureId = L.Util.stamp(layer); content += `<button class="popup-button" onclick="downloadGeoJSON(${featureId})">GeoJSON</button>`; content += `<button class="popup-button" onclick="downloadKML(${featureId})">KML</button>`; content += `<button class="popup-button" onclick="downloadCSV(${featureId})">CSV</button>`; layer.bindPopup(content).openPopup(); }
+            function bindFeaturePopup(layer) {
+                const featureId = L.Util.stamp(layer);
+                const name = (layer.feature && layer.feature.properties && layer.feature.properties.name) ? layer.feature.properties.name : `Feição ${featureId}`;
+                let content = `<h4>${name}</h4>`;
+                if (layer instanceof L.Polygon && !(layer instanceof L.Circle)) { const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]); const perimeter = calculatePerimeter(layer.getLatLngs()[0]); content += `<p><b>Área (ROI):</b> ${area.toFixed(2)} m²</p><p><b>Perímetro:</b> ${perimeter.toFixed(2)} m</p>`; } else if (layer instanceof L.Polyline) { const distance = calculatePerimeter(layer.getLatLngs()); content += `<p><b>Distância:</b> ${distance.toFixed(2)} m</p>`; } else if(layer instanceof L.Circle) { content += `<p><b>Raio:</b> ${layer.getRadius().toFixed(2)} m</p><p><b>Área:</b> ${(Math.PI * Math.pow(layer.getRadius(), 2)).toFixed(2)} m²</p>`; } 
+                content += `<hr style="margin: 5px 0;">`;
+                content += `<button class="popup-button" onclick="downloadGeoJSON(${featureId})">GeoJSON</button><button class="popup-button" onclick="downloadKML(${featureId})">KML</button><button class="popup-button" onclick="downloadCSV(${featureId})">CSV</button>`;
+                layer.bindPopup(content);
+            }
+            
             function calculatePerimeter(latlngs) { let distance = 0; for (let i = 0; i < latlngs.length - 1; i++) { distance += latlngs[i].distanceTo(latlngs[i+1]); } if (latlngs.length > 2 && !latlngs[0].equals(latlngs[latlngs.length - 1])) { distance += latlngs[latlngs.length - 1].distanceTo(latlngs[0]); } return distance; }
             
             function downloadData(data, filename, type) { const blob = new Blob([data], {type: type}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); }
-            window.downloadGeoJSON = function(layerId) { downloadData(JSON.stringify(drawnItems.getLayer(layerId).toGeoJSON()), `feature_${layerId}.geojson`, 'text/json'); }
-            window.downloadKML = function(layerId) { downloadData(toKML([drawnItems.getLayer(layerId)]), `feature_${layerId}.kml`, 'application/vnd.google-earth.kml+xml'); }
-            window.downloadCSV = function(layerId) { downloadData(toCSV([drawnItems.getLayer(layerId)]), `feature_${layerId}.csv`, 'text/csv'); }
-            function toKML(layers) { let kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>'; (Array.isArray(layers) ? layers : [layers]).forEach(layerOrData => { const layer = layerOrData.marker || layerOrData; kml += '<Placemark>'; if(layerOrData.name) kml += `<name>${layerOrData.name}</name>`; if(layerOrData.type) kml += `<description>${layerOrData.type}</description>`; const geojson = layer.toGeoJSON(); const coords = geojson.geometry.coordinates; if (geojson.geometry.type === 'Point') kml += `<Point><coordinates>${coords[0]},${coords[1]},0</coordinates></Point>`; else if (geojson.geometry.type === 'Polygon') { kml += '<Polygon><outerBoundaryIs><LinearRing><coordinates>'; coords[0].forEach(p => kml += `${p[0]},${p[1]},0 `); kml += '</coordinates></LinearRing></outerBoundaryIs></Polygon>'; } else if (geojson.geometry.type === 'LineString') { kml += '<LineString><coordinates>'; coords.forEach(p => kml += `${p[0]},${p[1]},0 `); kml += '</coordinates></LineString>'; } kml += '</Placemark>'; }); kml += '</Document></kml>'; return kml; }
-            function toCSV(layers) { let csvContent = "Nome,Tipo,Latitude,Longitude,Easting,Northing,Fuso\n"; (Array.isArray(layers) ? layers : [layers]).forEach(layerOrData => { const l = layerOrData.marker || layerOrData; const d = layerOrData.name ? layerOrData : {}; let coords = []; if (l instanceof L.Polygon) coords = l.getLatLngs()[0]; else if (l instanceof L.Polyline) coords = l.getLatLngs(); else if (l instanceof L.Marker || l instanceof L.Circle) coords = [l.getLatLng()]; coords.forEach(latlng => { const utm = latLonToUTM(latlng.lat, latlng.lng, 24); const row = `"${d.name || ''}","${d.type || ''}",${latlng.lat.toFixed(6)},${latlng.lng.toFixed(6)},${utm.easting.toFixed(2)},${utm.northing.toFixed(2)},"${utm.zoneNum}${utm.zoneLetter}"\n`; csvContent += row; }); }); return csvContent; }
+            window.downloadGeoJSON = function(layerId) { const layer = drawnItems.getLayer(layerId); if(layer) downloadData(JSON.stringify(layer.toGeoJSON()), `${getFeatureName(layer.feature)}.geojson`, 'text/json'); }
+            window.downloadKML = function(layerId) { const layer = drawnItems.getLayer(layerId); if(layer) downloadData(toKML(layer), `${getFeatureName(layer.feature)}.kml`, 'application/vnd.google-earth.kml+xml'); }
+            window.downloadCSV = function(layerId) { const layer = drawnItems.getLayer(layerId); if(layer) downloadData(toDrawnCSV(layer), `${getFeatureName(layer.feature)}.csv`, 'text/csv'); }
+            function getFeatureName(feature) { return (feature && feature.properties && feature.properties.name) ? feature.properties.name.replace(/[^a-z0-9]/gi, '_') : 'feature'; }
             
-            function handleFileImport(e) { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = function(event) { const content = event.target.result; const extension = file.name.split('.').pop().toLowerCase(); try { if (extension === 'geojson' || extension === 'json') { const geojsonData = JSON.parse(content); L.geoJSON(geojsonData).addTo(drawnItems); } else if (extension === 'kml') { const geojsonData = toGeoJSON.kml(new DOMParser().parseFromString(content, 'text/xml')); L.geoJSON(geojsonData).addTo(drawnItems); } else if (extension === 'csv') { parseAndDisplayCSV(content); } else { alert('Formato de arquivo não suportado.'); } } catch (error) { alert('Erro ao processar o arquivo: ' + error.message); } }; reader.readAsText(file); }
-            function parseAndDisplayCSV(csvText) { const lines = csvText.split('\n').filter(l => l.trim() !== ''); if (lines.length < 2) { alert('CSV inválido ou vazio.'); return; } const header = lines[0].toLowerCase().split(',').map(h => h.trim()); const latIndex = header.findIndex(h => h.includes('lat')); const lonIndex = header.findIndex(h => h.includes('lon') || h.includes('lng')); const eastingIndex = header.findIndex(h => h.includes('easting') || h.includes('e')); const northingIndex = header.findIndex(h => h.includes('northing') || h.includes('n')); for (let i = 1; i < lines.length; i++) { const data = lines[i].split(','); let lat, lon; if (latIndex > -1 && lonIndex > -1) { lat = parseFloat(data[latIndex]); lon = parseFloat(data[lonIndex]); } else if (eastingIndex > -1 && northingIndex > -1) { const utmResult = utmToLatLon(24, parseFloat(data[eastingIndex]), parseFloat(data[northingIndex]), false); lat = utmResult.lat; lon = utmResult.lon; } if (!isNaN(lat) && !isNaN(lon)) { L.marker([lat, lon]).addTo(drawnItems); } } }
+            function toKML(layers) { let kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>'; (Array.isArray(layers) ? layers : [layers]).forEach(item => { const layer = item.marker || item; const geojson = layer.toGeoJSON(); const name = item.name || (geojson.properties && geojson.properties.name) || ''; const type = item.type || ''; const coords = geojson.geometry.coordinates; kml += '<Placemark>'; if(name) kml += `<name>${name}</name>`; if(type) kml += `<description>${type}</description>`; if (geojson.geometry.type === 'Point') kml += `<Point><coordinates>${coords[0]},${coords[1]},0</coordinates></Point>`; else if (geojson.geometry.type === 'Polygon') { kml += '<Polygon><outerBoundaryIs><LinearRing><coordinates>'; coords[0].forEach(p => kml += `${p[0]},${p[1]},0 `); kml += '</coordinates></LinearRing></outerBoundaryIs></Polygon>'; } else if (geojson.geometry.type === 'LineString') { kml += '<LineString><coordinates>'; coords.forEach(p => kml += `${p[0]},${p[1]},0 `); kml += '</coordinates></LineString>'; } kml += '</Placemark>'; }); kml += '</Document></kml>'; return kml; }
+            
+            function toCSV(labels) { let csvContent = "Nome,Tipo,Latitude,Longitude,Easting,Northing,Fuso\n"; labels.forEach(label => { const utm = latLonToUTM(label.latlng.lat, label.latlng.lng, 24); const row = `"${label.name}","${label.type}",${label.latlng.lat.toFixed(6)},${label.latlng.lng.toFixed(6)},${utm.easting.toFixed(2)},${utm.northing.toFixed(2)},"${utm.zoneNum}${utm.zoneLetter}"\n`; csvContent += row; }); return csvContent; }
+            
+            function toDrawnCSV(layer) { let csvContent = "Nome,TipoGeometria,Latitude,Longitude,Easting,Northing,Fuso\n"; const geojson = layer.toGeoJSON(); const name = (geojson.properties && geojson.properties.name) || ''; const geomType = geojson.geometry.type; let coords = []; if (layer instanceof L.Polygon || layer instanceof L.Circle) { coords = layer.getLatLngs()[0]; } else if (layer instanceof L.Polyline) { coords = layer.getLatLngs(); } else if (layer instanceof L.Marker) { coords = [layer.getLatLng()]; } coords.forEach(latlng => { const utm = latLonToUTM(latlng.lat, latlng.lng, 24); const row = `"${name}","${geomType}",${latlng.lat.toFixed(6)},${latlng.lng.toFixed(6)},${utm.easting.toFixed(2)},${utm.northing.toFixed(2)},"${utm.zoneNum}${utm.zoneLetter}"\n`; csvContent += row; }); return csvContent; }
+
+            function handleFileImport(e) { 
+                const file = e.target.files[0]; if (!file) return; 
+                const reader = new FileReader(); 
+                reader.onload = function(event) { 
+                    const content = event.target.result; 
+                    const extension = file.name.split('.').pop().toLowerCase(); 
+                    try { 
+                        let geojsonLayer;
+                        if (extension === 'geojson' || extension === 'json') { 
+                            geojsonLayer = L.geoJSON(JSON.parse(content));
+                        } else if (extension === 'kml') { 
+                            geojsonLayer = L.geoJSON(toGeoJSON.kml(new DOMParser().parseFromString(content, 'text/xml')));
+                        } else if (extension === 'csv') { 
+                            parseAndDisplayCSV(content); return;
+                        } else { 
+                            alert('Formato de arquivo não suportado.'); return;
+                        }
+                        const defaultName = file.name.replace(/\.[^/.]+$/, "");
+                        geojsonLayer.eachLayer(function(layer) {
+                            const originalName = (layer.feature && layer.feature.properties && layer.feature.properties.name) ? layer.feature.properties.name : null;
+                            const newName = prompt("Identifique a feição importada:", originalName || defaultName || `Importado-${L.Util.stamp(layer)}`);
+                            if(newName) {
+                               if (!layer.feature) layer.feature = {};
+                               if (!layer.feature.properties) layer.feature.properties = {};
+                               layer.feature.properties.name = newName;
+                               drawnItems.addLayer(layer);
+                               bindFeaturePopup(layer);
+                            }
+                        });
+                    } catch (error) { 
+                        alert('Erro ao processar o arquivo: ' + error.message); 
+                    } 
+                }; 
+                reader.readAsText(file); 
+            }
+
+            function parseAndDisplayCSV(csvText) { const lines = csvText.split('\n').filter(l => l.trim() !== ''); if (lines.length < 2) { alert('CSV inválido ou vazio.'); return; } const header = lines[0].toLowerCase().split(',').map(h => h.trim()); const latIndex = header.findIndex(h => h.includes('lat')); const lonIndex = header.findIndex(h => h.includes('lon') || h.includes('lng')); const eastingIndex = header.findIndex(h => h.includes('easting') || h.includes('e')); const northingIndex = header.findIndex(h => h.includes('northing') || h.includes('n')); for (let i = 1; i < lines.length; i++) { const data = lines[i].split(','); let lat, lon; if (latIndex > -1 && lonIndex > -1) { lat = parseFloat(data[latIndex]); lon = parseFloat(data[lonIndex]); } else if (eastingIndex > -1 && northingIndex > -1) { const utmResult = utmToLatLon(24, parseFloat(data[eastingIndex]), parseFloat(data[northingIndex]), false); lat = utmResult.lat; lon = utmResult.lon; } if (!isNaN(lat) && !isNaN(lon)) { const marker = L.marker([lat, lon]); drawnItems.addLayer(marker); bindFeaturePopup(marker); } } }
 
             function locateFromInput() { const input = document.getElementById('coord-input').value.trim(); const coords = input.split(/[\s,;]+/).map(Number); if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) { alert("Formato inválido."); return; } let lat, lon; if (Math.abs(coords[0]) > 180 || Math.abs(coords[1]) > 180) { const utmResult = utmToLatLon(24, coords[0], coords[1], false); lat = utmResult.lat; lon = utmResult.lon; } else { lat = coords[0]; lon = coords[1]; } if (locatedMarker) map.removeLayer(locatedMarker); locatedMarker = L.marker([lat, lon]).addTo(map); map.setView([lat, lon], 15); closeModal('locate-modal'); }
             function utmToLatLon(zone,easting,northing,northernHemisphere) {const k0=0.9996;const a=6378137;const f=1/298.257223563;const e2=2*f-f*f;const e_2=e2/(1-e2);const n=(a-a*Math.sqrt(1-e2))/(a+a*Math.sqrt(1-e2));const M0=0;const M=M0+(northing-(northernHemisphere?0:10000000))/k0;const mu=M/(a*(1-e2/4-3*e2*e2/64-5*e2*e2*e2/256));const e1=(1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2));const lat1=mu+(3*e1/2-27*e1*e1*e1/32)*Math.sin(2*mu)+(21*e1*e1/16-55*e1*e1*e1*e1/32)*Math.sin(4*mu)+(151*e1*e1*e1/96)*Math.sin(6*mu);const C1=e_2*Math.pow(Math.cos(lat1),2);const T1=Math.pow(Math.tan(lat1),2);const N1=a/Math.sqrt(1-e2*Math.pow(Math.sin(lat1),2));const R1=N1*(1-e2)/(1-e2*Math.pow(Math.sin(lat1),2));const D=(easting-500000)/(N1*k0);let lat=lat1-(N1*Math.tan(lat1)/R1)*(D*D/2-(5+3*T1+10*C1-4*C1*C1-9*e_2)*D*D*D*D/24+(61+90*T1+298*C1+45*T1*T1-252*e_2-3*C1*C1)*D*D*D*D*D*D/720);let lon=(D-(1+2*T1+C1)*D*D*D/6+(5-2*C1+28*T1-3*C1*C1+8*e_2+24*T1*T1)*D*D*D*D*D/120)/Math.cos(lat1);const lon_cen=(zone-1)*6-180+3;return {lat:lat*180/Math.PI,lon:lon_cen+lon*180/Math.PI};}
@@ -263,4 +436,4 @@
         };
     </script>
 </body>
-</html>
+</ht
